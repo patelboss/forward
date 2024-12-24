@@ -1,0 +1,21 @@
+name: telegram-forwarder-bot
+description: Telegram forwarder bot deployment on Koyeb
+
+services:
+  - name: forwarder-bot
+    type: app
+    routes:
+      - port: 8000
+    docker:
+      image: registry.koyeb.com/patelboss/telegram-forwarder-bot:latest
+    env:
+      - name: API_ID
+        value: "<your-api-id>"
+      - name: API_HASH
+        value: "<your-api-hash>"
+      - name: BOT_TOKEN
+        value: "<your-bot-token>"
+      - name: DATABASE_URI
+        value: "mongodb+srv://<username>:<password>@cluster.mongodb.net/<dbname>"
+      - name: DATABASE_NAME
+        value: "telegram_bot"
