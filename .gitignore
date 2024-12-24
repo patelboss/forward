@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environment
+env/
+venv/
+*.env
+
+# Cache files
+*.cache
+*.log
+*.pot
+*.pyc
+
+# Testing files
+.tox/
+.nox/
+.coverage
+.coverage.*
+
+# Distribution / Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local configuration
+config.py
+.env
+
+# Pyrogram session files
+*.session
+*.session-journal
+
+# IDE-specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Operating system files
+.DS_Store
+Thumbs.db
