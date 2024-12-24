@@ -3,8 +3,5 @@ pymongo==4.6.0     # MongoDB driver for Python
 motor==3.5.1       # Async MongoDB driver
 asyncio==3.4.3     # Async utilities
 pyromod 
-pyrogram
-pymongo
-motor
 uvicorn
 fastapi
