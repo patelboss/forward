@@ -1,8 +1,8 @@
-pyrogram>=2.0.107  # Telegram client library
+pyrogram>=2.0.106  # Telegram client library
 pymongo==4.6.0     # MongoDB driver for Python
 motor==3.5.1       # Async MongoDB driver
 asyncio==3.4.3     # Async utilities
-pyromod>= 1.0.7
+pyromod>=1.0.7
 uvicorn
 fastapi
 aiohttp
