@@ -6,3 +6,4 @@ pyromod
 uvicorn
 fastapi
 aiohttp
+tgcrypto
