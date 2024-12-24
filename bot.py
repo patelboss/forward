@@ -1,7 +1,7 @@
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from config import BOT_TOKEN, API_ID, API_HASH
-
+from pyromod import listen 
 bot = Client(
     "bot",
     api_id=API_ID,
