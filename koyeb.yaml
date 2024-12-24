@@ -1,11 +1,17 @@
 name: telegram-forwarder-bot
 description: Telegram forwarder bot deployment on Koyeb
-
 services:
   - name: forwarder-bot
     type: app
     routes:
       - port: 8000
+    healthchecks:
+      - protocol: HTTP
+        path: /health
+        method: GET
+        interval: 5s
+        timeout: 2s
+        grace: 10s
     docker:
       image: registry.koyeb.com/patelboss/telegram-forwarder-bot:latest
     env:
