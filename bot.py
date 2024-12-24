@@ -27,7 +27,7 @@ async def start_server():
 # Run the bot and web server concurrently
 async def main():
     await asyncio.gather(bot.start(), start_server())
-    await bot.idle()
+    await bot.run()
 
 # Entry point
 if __name__ == "__main__":
