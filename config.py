@@ -1,10 +1,10 @@
-import os
+import re
+from os import environ
 
-# Bot credentials
-API_ID = int(os.getenv("API_ID", "123456"))
-API_HASH = os.getenv("API_HASH", "your_api_hash")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "your_bot_token")
-
-# Database settings
-DATABASE_URI = os.getenv("DATABASE_URI", "mongodb://localhost:27017")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "telegram_bot")
+#SESSION = environ.get('SESSION', 'Media_search')
+API_ID = int(environ['API_ID'])
+API_HASH = environ['API_HASH']
+BOT_TOKEN = environ['BOT_TOKEN']
+DATABASE_URI = environ.get('DATABASE_URI', "")
+DATABASE_NAME = environ.get('DATABASE_NAME', "LazyDeveloper")
+COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Telegram_files')
