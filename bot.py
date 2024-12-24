@@ -1,6 +1,7 @@
 import asyncio
 from aiohttp import web
 from pyrogram import Client
+import uvloop
 from pyromod import listen
 from info import *  # Ensure you have the correct environment variable imports
 
@@ -41,4 +42,5 @@ async def main():
 
 # Entry point
 if __name__ == "__main__":
+    uvloop.install()
     asyncio.run(main())  # Run the main async function
