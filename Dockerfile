@@ -1,18 +1,17 @@
-# Use an official Python runtime as the base image
+# Use the official lightweight Python image
 FROM python:3.10-slim
 
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the entire project into the container
+# Copy the application code and dependencies
 COPY . .
 
-# Expose the necessary port (Koyeb assigns ports dynamically, so it's optional)
-EXPOSE 8000
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Command to run your bot
+# Expose the port for health checks or FastAPI if needed
+EXPOSE 8080
+
+# Run the bot
 CMD ["python", "bot.py"]
