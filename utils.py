@@ -5,7 +5,7 @@ async def listen(chat_id, timeout=60):
     from bot import bot
 
     try:
-        response = await bot.listen(chat_id, filters=filters.text, timeout=timeout)
+        response = await bot.ask(chat_id, filters=filters.text, timeout=timeout)
         return response.text
     except TimeoutError:
         return None
