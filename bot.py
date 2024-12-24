@@ -1,49 +1,84 @@
 import asyncio
-from aiohttp import web
+import logging
+import logging.config
 from pyrogram import Client
-import uvloop
-from info import *  # Ensure you have the correct environment variable imports
-from pyromod import listen
-# Define the bot
-class MyBot(Client):
+from pyrogram.enums import ParseMode
+from aiohttp import web
+from pyromod import listen  # type: ignore
+from info import BOT_TOKEN, API_ID, API_HASH, LOGGER, BOT_SESSION
+
+# Set up logging
+logging.config.fileConfig('logging.conf')
+logging.getLogger().setLevel(logging.INFO)
+logging.getLogger("pyrogram").setLevel(logging.ERROR)
+
+# Define the Bot class
+class Bot(Client):
     def __init__(self):
+        """Initialize the bot with enhanced logging."""
+        self.LOGGER = LOGGER
+        self.LOGGER(__name__).info("Initializing the bot...")
+
+        # Log session information
+        if BOT_SESSION:
+            self.LOGGER(__name__).info("Using the provided BOT_SESSION for the bot.")
+        else:
+            self.LOGGER(__name__).warning("No BOT_SESSION provided. Using an in-memory session temporarily.")
+
+        # Initialize the client with API credentials and session management
         super().__init__(
-            "telegram_forwarder_bot",
+            BOT_SESSION,  # Session name or in-memory session
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
+            parse_mode=ParseMode.HTML,
+            plugins={"root": "plugins"},
+            workers=10
         )
+        self.LOGGER(__name__).info("Bot initialization complete. Ready to start.")
 
     async def start(self):
-        await super().start()  # Initialize the client
-        me = await self.get_me()  # Fetch bot details
-        print(f"Bot started successfully with username: {me.username}")  # Log username
+        """Start the bot with detailed logging."""
+        self.LOGGER(__name__).info("Starting the bot...")
+        try:
+            await super().start()
+            self.LOGGER(__name__).info("Successfully connected to Telegram servers.")
 
-# Define the health check endpoint
+            # Fetch bot information and log it
+            me = await self.get_me()
+            self.LOGGER(__name__).info(f"Bot details: @{me.username}, {me.first_name}")
+
+        except Exception as e:
+            self.LOGGER(__name__).error(f"Error during bot startup: {e}")
+            raise
+
+    async def stop(self):
+        """Stop the bot with clean shutdown."""
+        self.LOGGER(__name__).info("Stopping the bot...")
+        try:
+            await super().stop()
+            self.LOGGER(__name__).info("Bot disconnected from Telegram servers.")
+        except Exception as e:
+            self.LOGGER(__name__).error(f"Error during bot shutdown: {e}")
+
+# Health check for aiohttp
 async def health_check(request):
     return web.Response(text="OK")
 
-# Start the aiohttp web server
+# Start aiohttp web server
 async def start_server():
     app = web.Application()
-    app.router.add_get("/health", health_check)  # Add a /health endpoint
+    app.router.add_get("/health", health_check)  # /health endpoint
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
 
-# Run the bot and web server concurrently
+# Main function to run both bot and web server concurrently
 async def main():
-    bot = MyBot()
+    bot = Bot()
+    await asyncio.gather(bot.start(), start_server())  # Run both bot and web server
+    await bot.idle()  # Keep the bot running until it is stopped
 
-    # Start both the bot and web server concurrently
-    await asyncio.gather(bot.start(), start_server())
-
-    # The 'idle' function is essential to keep the bot running
-    await bot.idle()
-
-# Entry point
 if __name__ == "__main__":
-    uvloop.install()  # Optional: use uvloop for better performance
-    loop = asyncio.get_event_loop()  # Use the current event loop
-    loop.run_until_complete(main())  # Run the main async function
+    asyncio.run(main())  # Start the bot and server concurrently
