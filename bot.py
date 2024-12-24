@@ -2,27 +2,25 @@ import asyncio
 from aiohttp import web
 from pyrogram import Client
 from pyromod import listen
-from info import API_ID, API_HASH, BOT_TOKEN
+from info import *  # Ensure you have the correct environment variable imports
 
 # Define the bot
 class MyBot(Client):
     def __init__(self):
         super().__init__(
-            "telegram_forwarder_bot",  # Session name
+            "telegram_forwarder_bot",
             api_id=API_ID,
             api_hash=API_HASH,
             bot_token=BOT_TOKEN,
         )
 
     async def start(self):
-        """Override start method to start the bot."""
-        await super().start()  # Ensure the pyrogram Client starts properly
-        print(f"Bot started successfully with username: {self.username}")
+        # Ensure bot starts successfully before accessing the username
+        await super().start()
+        me = await self.get_me()  # Fetch bot details
+        print(f"Bot started successfully with username: {me.username}")  # Log username
 
-# Initialize the bot
-bot = MyBot()
-
-# Define the health check endpoint for the web server
+# Define the health check endpoint
 async def health_check(request):
     return web.Response(text="OK")
 
@@ -37,8 +35,9 @@ async def start_server():
 
 # Run the bot and web server concurrently
 async def main():
+    bot = MyBot()
     await asyncio.gather(bot.start(), start_server())  # Run both bot and web server
-    await bot.idle()  # Keep the bot running until manually stopped
+    await bot.idle()
 
 # Entry point
 if __name__ == "__main__":
