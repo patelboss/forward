@@ -5,8 +5,7 @@ from pyrogram import Client
 from pyrogram.enums import ParseMode
 from aiohttp import web
 from pyromod import listen  # type: ignore
-from info import BOT_TOKEN, API_ID, API_HASH, LOGGER, BOT_SESSION
-
+from info import *
 # Set up logging
 logging.config.fileConfig('logging.conf')
 logging.getLogger().setLevel(logging.INFO)
