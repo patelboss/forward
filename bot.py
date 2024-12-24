@@ -37,10 +37,15 @@ async def start_server():
 # Run the bot and web server concurrently
 async def main():
     bot = MyBot()
+
+    # Start bot and web server concurrently
     await asyncio.gather(bot.start(), start_server())  # Run both bot and web server
+
+    # Keep the bot running
     await bot.idle()
 
 # Entry point
 if __name__ == "__main__":
-    uvloop.install()
-    asyncio.run(main())  # Run the main async function
+    uvloop.install()  # Optional, can be removed if you are not using uvloop
+    loop = asyncio.get_event_loop()  # Get the current event loop
+    loop.run_until_complete(main())  # Run the main async function
