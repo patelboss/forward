@@ -1,11 +1,12 @@
+from pyromod import listen 
+import os
 import asyncio
 import logging
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from aiohttp import web
 from info import BOT_TOKEN, API_ID, API_HASH, LOGGER, BOT_SESSION
-from pyromod import listen 
-import os
+
 # Configure logging programmatically
 logging.basicConfig(
     level=logging.INFO,
@@ -75,8 +76,11 @@ async def start_server():
 # Main function to run both bot and web server concurrently
 async def main():
     bot = Bot()
-    await asyncio.gather(bot.start(), start_server())
-    await bot.idle()
+    try:
+        await asyncio.gather(bot.start(), start_server())  # Start bot and web server concurrently
+        await asyncio.Event().wait()  # Keep the bot running until it is stopped manually
+    finally:
+        await bot.stop()  # Cleanly stop the bot when exiting
 
 if __name__ == "__main__":
     asyncio.run(main())
