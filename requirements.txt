@@ -5,3 +5,4 @@ asyncio==3.4.3     # Async utilities
 pyromod 
 uvicorn
 fastapi
+aiohttp
