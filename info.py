@@ -2,8 +2,8 @@ import re
 from os import environ
 
 # Log the session (uncomment if you want to use it)
-# SESSION = environ.get('SESSION', 'Media_search')
-# print(f"SESSION: {SESSION}")
+ BOT_SESSION = environ.get('SESSION', 'Media_search')
+ print(f"SESSION: {BOT_SESSION}")
 
 # Fetch and log API_ID, API_HASH, and BOT_TOKEN
 try:
