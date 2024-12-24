@@ -3,7 +3,7 @@ from aiohttp import web
 from pyrogram import Client
 import uvloop
 from info import *  # Ensure you have the correct environment variable imports
-import pyromod.listen
+from pyromod import listen
 # Define the bot
 class MyBot(Client):
     def __init__(self):
