@@ -21,7 +21,7 @@ async def start_server():
     app.router.add_get("/health", health_check)  # Add a /health endpoint
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8000)
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
 
 # Run the bot and web server concurrently
