@@ -2,9 +2,8 @@ import asyncio
 from aiohttp import web
 from pyrogram import Client
 import uvloop
-from pyromod import listen
 from info import *  # Ensure you have the correct environment variable imports
-
+import pyromod.listen
 # Define the bot
 class MyBot(Client):
     def __init__(self):
@@ -16,8 +15,7 @@ class MyBot(Client):
         )
 
     async def start(self):
-        # Ensure bot starts successfully before accessing the username
-        await super().start()
+        await super().start()  # Initialize the client
         me = await self.get_me()  # Fetch bot details
         print(f"Bot started successfully with username: {me.username}")  # Log username
 
@@ -38,14 +36,14 @@ async def start_server():
 async def main():
     bot = MyBot()
 
-    # Start bot and web server concurrently
-    await asyncio.gather(bot.start(), start_server())  # Run both bot and web server
+    # Start both the bot and web server concurrently
+    await asyncio.gather(bot.start(), start_server())
 
-    # Keep the bot running
+    # The 'idle' function is essential to keep the bot running
     await bot.idle()
 
 # Entry point
 if __name__ == "__main__":
-    uvloop.install()  # Optional, can be removed if you are not using uvloop
-    loop = asyncio.get_event_loop()  # Get the current event loop
+    uvloop.install()  # Optional: use uvloop for better performance
+    loop = asyncio.get_event_loop()  # Use the current event loop
     loop.run_until_complete(main())  # Run the main async function
