@@ -1,10 +1,6 @@
 import re
 from os import environ
 
-# Log the session (uncomment if you want to use it)
- BOT_SESSION = environ.get('SESSION', 'Media_search')
- print(f"SESSION: {BOT_SESSION}")
-
 # Fetch and log API_ID, API_HASH, and BOT_TOKEN
 try:
     API_ID = int(environ['API_ID'])
@@ -36,3 +32,7 @@ print(f"DATABASE_NAME: {DATABASE_NAME}")
 
 COLLECTION_NAME = environ.get('COLLECTION_NAME', 'Telegram_files')
 print(f"COLLECTION_NAME: {COLLECTION_NAME}")
+# Log the session (uncomment if you want to use it)
+BOT_SESSION = environ.get('BOT_SESSION', 'Media_search')
+print(f"SESSION: {BOT_SESSION}")
+
