@@ -1,7 +1,6 @@
-from pyromod import listen 
-import os
 import asyncio
 import logging
+from pyromod.listen import Listen
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from aiohttp import web
@@ -15,19 +14,14 @@ logging.basicConfig(
 )
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
-# Define the Bot class
+
 class Bot(Client):
     def __init__(self):
-        """Initialize the bot with enhanced logging."""
+        """Initialize the bot with unified event loop."""
         self.LOGGER = LOGGER
         self.LOGGER(__name__).info("Initializing the bot...")
 
-        # Log session information
-        if BOT_SESSION:
-            self.LOGGER(__name__).info("Using the provided BOT_SESSION for the bot.")
-        else:
-            self.LOGGER(__name__).warning("No BOT_SESSION provided. Using an in-memory session temporarily.")
-
+        # Use Listen for pyromod integration
         super().__init__(
             BOT_SESSION,
             api_id=API_ID,
@@ -37,9 +31,15 @@ class Bot(Client):
             plugins={"root": "plugins"},
             workers=10,
         )
-        self.LOGGER(__name__).info("Bot initialization complete. Ready to start.")
+
+        # Ensure pyromod uses the same event loop
+        self.listen = Listen(self)
+        self.loop = asyncio.get_event_loop()
+
+        self.LOGGER(__name__).info("Bot initialization complete.")
 
     async def start(self):
+        """Start the bot with unified event loop."""
         self.LOGGER(__name__).info("Starting the bot...")
         try:
             await super().start()
@@ -50,6 +50,7 @@ class Bot(Client):
             raise
 
     async def stop(self):
+        """Stop the bot with clean shutdown."""
         self.LOGGER(__name__).info("Stopping the bot...")
         try:
             await super().stop()
@@ -57,12 +58,15 @@ class Bot(Client):
         except Exception as e:
             self.LOGGER(__name__).error(f"Error during bot shutdown: {e}")
 
+
 # Health check for aiohttp
 async def health_check(request):
     return web.Response(text="OK")
 
+
 # Start aiohttp web server
 async def start_server():
+    """Starts the health check server."""
     try:
         app = web.Application()
         app.router.add_get("/health", health_check)
@@ -70,17 +74,31 @@ async def start_server():
         await runner.setup()
         site = web.TCPSite(runner, "0.0.0.0", int(os.getenv("PORT", 8080)))
         await site.start()
+        return runner  # Return runner for cleanup
     except Exception as e:
         logging.error(f"Failed to start the web server: {e}")
 
+
 # Main function to run both bot and web server concurrently
 async def main():
+    """Runs the bot and health check server concurrently with graceful shutdown."""
     bot = Bot()
-    try:
-        await asyncio.gather(bot.start(), start_server())  # Start bot and web server concurrently
-        await asyncio.Event().wait()  # Keep the bot running until it is stopped manually
-    finally:
-        await bot.stop()  # Cleanly stop the bot when exiting
+    runner = None
 
+    try:
+        runner = await start_server()
+        await asyncio.gather(bot.start(), asyncio.Event().wait())  # Keep running until stopped
+    except asyncio.CancelledError:
+        logging.info("Shutting down gracefully...")
+    finally:
+        await bot.stop()  # Cleanly stop the bot
+        if runner:
+            await runner.cleanup()  # Clean up aiohttp runner resources
+
+
+# Start asyncio event loop
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("Process interrupted by user.")
