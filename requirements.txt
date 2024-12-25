@@ -8,4 +8,4 @@ fastapi
 aiohttp
 tgcrypto
 uvloop
-threading
+flask
