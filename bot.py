@@ -1,14 +1,11 @@
-#Modify this one
-
-
-from pyromod import listen 
+from pyromod import listen
 import os
-import asyncio
 import logging
 from pyrogram import Client
 from pyrogram.enums import ParseMode
-from aiohttp import web
+from flask import Flask, jsonify
 from info import BOT_TOKEN, API_ID, API_HASH, LOGGER, BOT_SESSION
+from threading import Thread
 
 # Configure logging programmatically
 logging.basicConfig(
@@ -60,31 +57,32 @@ class Bot(Client):
         except Exception as e:
             self.LOGGER(__name__).error(f"Error during bot shutdown: {e}")
 
-# Health check for aiohttp
-async def health_check(request):
-    return web.Response(text="OK")
+# Health check for Flask
+app = Flask(__name__)
 
-# Start aiohttp web server
-async def start_server():
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "OK"}), 200
+
+# Start Flask server in a separate thread
+def start_flask_server():
     try:
-        app = web.Application()
-        app.router.add_get("/health", health_check)
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, "0.0.0.0", int(os.getenv("PORT", 8080)))
-        await site.start()
+        port = int(os.getenv("PORT", 8080))
+        app.run(host="0.0.0.0", port=port)
     except Exception as e:
-        logging.error(f"Failed to start the web server: {e}")
+        logging.error(f"Failed to start the Flask server: {e}")
 
-# Main function to run both bot and web server concurrently
-async def main():
+# Main function to run both bot and Flask server concurrently
+def main():
     bot = Bot()
-    try:
-        await asyncio.gather(bot.start(), start_server())  # Start bot and web server concurrently
-        await asyncio.Event().wait()  # Keep the bot running until it is stopped manually
-    finally:
-        await bot.stop()  # Cleanly stop the bot when exiting
+
+    # Start Flask server in a separate thread
+    flask_thread = Thread(target=start_flask_server)
+    flask_thread.daemon = True  # Ensure it exits when the main program exits
+    flask_thread.start()
+
+    # Run the bot using bot.run()
+    bot.run()
 
 if __name__ == "__main__":
-    asyncio.run(main())
-            
+    main()
