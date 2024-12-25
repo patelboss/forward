@@ -1,16 +1,17 @@
 import logging
-from pyrogram import Client
+from pyrogram import Client, filters
 from database.database import get_user_session, get_forward_rules
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@Client.on_message()
+@Client.on_message(filters.chat(lambda message: any(rule["source_chat"] == message.chat.id for rule in get_forward_rules(message.from_user.id))))
 async def forward_messages(client, message):
     user_id = message.from_user.id
     logger.info(f"Processing message from user {user_id}, chat ID: {message.chat.id}")
 
+    # Get forward rules for the user
     forward_rules = get_forward_rules(user_id)
     if not forward_rules:
         logger.info(f"No forward rules found for user {user_id}.")
