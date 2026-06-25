@@ -1,11 +1,16 @@
-pyrogram #>=2.0.106  # Telegram client library
-pymongo==4.6.0     # MongoDB driver for Python
-motor==3.5.1       # Async MongoDB driver
-asyncio==3.4.3     # Async utilities
-pyromod #>=1.0.7
-uvicorn
-fastapi
-aiohttp
-tgcrypto
-uvloop
-flask
+# ── Telegram client ───────────────────────────────────────────────────────────
+pyrogram==2.0.106          # Async Telegram MTProto client (userbot + bot mode)
+TgCrypto==1.2.5            # Optional C crypto extension for Pyrogram (speed boost)
+
+# ── MongoDB async driver ──────────────────────────────────────────────────────
+motor==3.4.0               # Async Motor driver built on PyMongo
+
+# ── HTTP health-check server ──────────────────────────────────────────────────
+aiohttp==3.9.5             # Async HTTP server for Koyeb health endpoint
+
+# ── Configuration management ──────────────────────────────────────────────────
+pydantic-settings==2.3.4   # ENV-driven settings with Pydantic v2
+pydantic==2.7.4            # Data validation (pydantic-settings dependency)
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1       # Load .env file for local development
