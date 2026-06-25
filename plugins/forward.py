@@ -14,19 +14,16 @@ active_userbots = {}
 
 async def userbot_forward_handler(client: Client, message):
     """
-    This handler listens directly to the user's account traffic via the background worker.
-    It instantly intercepts incoming posts and clones them if a rule exists in MongoDB.
+    This handler intercepts incoming posts intercepted by the user account
+    and duplicates them to the target channel.
     """
     try:
         user_id = client.me.id
         
-        # 🔊 VERBOSE LISTENING LOGS
-        # This will fire for EVERY single message your account intercepts, showing that the ears are working!
         chat_title = message.chat.title or message.chat.first_name or "Private Chat/Group"
         sender_id = message.from_user.id if message.from_user else "Channel/Bot"
         logger.info(f"👂 [Userbot {user_id}] Hearing traffic in Chat: '{chat_title}' (ID: {message.chat.id}) | From Sender ID: {sender_id}")
 
-        # Offload the database read to a background thread to keep things completely asynchronous
         forward_rules = await asyncio.to_thread(get_forward_rules, user_id)
         if not forward_rules:
             return
@@ -72,6 +69,34 @@ async def userbot_forward_handler(client: Client, message):
         logger.error(f"Error in userbot_forward_handler: {e}")
 
 
+async def sync_channels_loop(user_id, user_client: Client):
+    """
+    Background loop that keeps the connection warm and forces Telegram 
+    to send updates for the configured source channels.
+    """
+    while user_id in active_userbots:
+        try:
+            user_rules = await asyncio.to_thread(get_forward_rules, user_id)
+            if user_rules:
+                for rule in user_rules:
+                    src_id = rule.get("source_chat")
+                    try:
+                        # ✅ THE TRIGGER: Forces Pyrogram to resolve the channel peer 
+                        # and signals Telegram's gateway to push new updates for it.
+                        await user_client.get_chat(src_id)
+                        logger.info(f"🎯 [Worker Sync] Keeping ears active on Source ID: {src_id}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ [Worker Sync] Could not sync channel {src_id}: {e}")
+            
+            # Run this sync routine every 60 seconds to prevent getting rate-limited
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            break
+        except Exception as loop_err:
+            logger.error(f"Error in sync loop for user {user_id}: {loop_err}")
+            await asyncio.sleep(10)
+
+
 async def boot_userbots():
     """
     This background daemon wakes up on application boot, reaches into MongoDB,
@@ -109,6 +134,10 @@ async def boot_userbots():
                 user_client.me = await user_client.get_me() 
                 active_userbots[user_id] = user_client
                 logger.info(f"✅ Background client is listening actively for User: {user_client.me.first_name}")
+
+                # Start the background synchronization worker task for this client
+                asyncio.create_task(sync_channels_loop(user_id, user_client))
+
             except Exception as auth_err:
                 logger.error(f"❌ Failed to validate session for {user_id}. It may have been revoked: {auth_err}")
 
