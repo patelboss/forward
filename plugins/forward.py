@@ -18,28 +18,30 @@ async def userbot_forward_handler(client: Client, message):
     It instantly intercepts incoming posts and clones them if a rule exists in MongoDB.
     """
     try:
-        # client.me.id stores the user's personal Telegram ID
         user_id = client.me.id
         
+        # 🔊 VERBOSE LISTENING LOGS
+        # This will fire for EVERY single message your account intercepts, showing that the ears are working!
+        chat_title = message.chat.title or message.chat.first_name or "Private Chat/Group"
+        sender_id = message.from_user.id if message.from_user else "Channel/Bot"
+        logger.info(f"👂 [Userbot {user_id}] Hearing traffic in Chat: '{chat_title}' (ID: {message.chat.id}) | From Sender ID: {sender_id}")
+
         # Offload the database read to a background thread to keep things completely asynchronous
         forward_rules = await asyncio.to_thread(get_forward_rules, user_id)
         if not forward_rules:
             return
 
-        # Scan active rules to find an immediate match for this specific incoming chat
         for rule in forward_rules:
             source_chat = rule.get("source_chat")
             target_chat = rule.get("target_chat")
             filters_config = rule.get("filters", {})
 
-            # Safety: Prevent infinite forwarding loops if target chat matches source
             if message.chat.id == target_chat:
                 continue
 
             if message.chat.id == source_chat:
-                logger.info(f"⚡ [Userbot {user_id}] Detected message in chat {source_chat}. Processing copy...")
+                logger.info(f"⚡ [Userbot {user_id}] Match found! Detected message in target source chat {source_chat}. Processing copy...")
 
-                # Analyze media/payload status
                 has_photo = bool(message.photo)
                 has_video = bool(message.video)
                 has_document = bool(message.document)
@@ -55,20 +57,16 @@ async def userbot_forward_handler(client: Client, message):
                 elif filters_config.get("text") and has_text:
                     should_forward = True
                 
-                # Fallback: If no explicit filter restrictions are saved, default to copying everything
                 if not any(filters_config.values()):
                     should_forward = True
 
                 if should_forward:
                     try:
-                        # ✅ THE PROTECTION BYPASS:
-                        # message.copy() strips tracking elements and downloads chunks directly 
-                        # to server RAM, completely ignoring restricted content/forward blocks.
                         await message.copy(chat_id=target_chat)
                         logger.info(f"✅ [Userbot {user_id}] Message cleanly duplicated to target: {target_chat}")
                     except Exception as copy_err:
                         logger.error(f"❌ [Userbot {user_id}] Failed to copy content payload: {copy_err}")
-                break # Matched the rule for this chat, break loop
+                break 
                 
     except Exception as e:
         logger.error(f"Error in userbot_forward_handler: {e}")
@@ -81,7 +79,6 @@ async def boot_userbots():
     """
     logger.info("🔄 Initializing background Userbot daemons from database...")
     try:
-        # Offload database pull to prevent thread blocking during initialization
         all_users = await asyncio.to_thread(lambda: list(users_col.find({"session": {"$exists": True, "$ne": None}})))
         
         if not all_users:
@@ -92,13 +89,11 @@ async def boot_userbots():
             user_id = user_data.get("user_id")
             session_string = user_data.get("session")
 
-            # If the background listener client is already running, skip it
             if user_id in active_userbots:
                 continue
 
             logger.info(f"🚀 Launching client engine for User ID: {user_id}...")
             
-            # Spawn a specialized client completely in-memory
             user_client = Client(
                 name=f"worker_{user_id}",
                 session_string=session_string,
@@ -107,7 +102,6 @@ async def boot_userbots():
                 in_memory=True
             )
 
-            # Bind our asynchronous forward handler directly to the user's incoming stream
             user_client.add_handler(MessageHandler(userbot_forward_handler, filters.incoming))
 
             try:
@@ -120,13 +114,3 @@ async def boot_userbots():
 
     except Exception as e:
         logger.error(f"Critical exception inside boot_userbots: {e}")
-
-# =====================================================================
-# DYNAMIC BOOT INTERCEPTOR
-# Drops this manager process into the master application's main loop.
-# =====================================================================
-try:
-    loop = asyncio.get_running_loop()
-    loop.create_task(boot_userbots())
-except RuntimeError:
-    pass
