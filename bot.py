@@ -1,11 +1,15 @@
 from pyromod import listen
 import os
 import logging
+import asyncio
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from flask import Flask, jsonify
 from info import BOT_TOKEN, API_ID, API_HASH, LOGGER, BOT_SESSION
 from threading import Thread
+
+# Import our bootloader function from our newly updated plugins/forward file
+from plugins.forward import boot_userbots
 
 # Configure logging programmatically
 logging.basicConfig(
@@ -15,18 +19,10 @@ logging.basicConfig(
 )
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
-# Define the Bot class
 class Bot(Client):
     def __init__(self):
-        """Initialize the bot with enhanced logging."""
         self.LOGGER = LOGGER
         self.LOGGER(__name__).info("Initializing the bot...")
-
-        # Log session information
-        if BOT_SESSION:
-            self.LOGGER(__name__).info("Using the provided BOT_SESSION for the bot.")
-        else:
-            self.LOGGER(__name__).warning("No BOT_SESSION provided. Using an in-memory session temporarily.")
 
         super().__init__(
             BOT_SESSION,
@@ -35,7 +31,7 @@ class Bot(Client):
             bot_token=BOT_TOKEN,
             parse_mode=ParseMode.HTML,
             plugins={"root": "plugins"},
-            workers=10,
+            workers=50,
         )
         self.LOGGER(__name__).info("Bot initialization complete. Ready to start.")
 
@@ -45,6 +41,10 @@ class Bot(Client):
             await super().start()
             me = await self.get_me()
             self.LOGGER(__name__).info(f"Bot details: @{me.username}, {me.first_name}")
+            
+            # ✅ FIXED: Run the background userbot engines safely inside the running loop
+            asyncio.create_task(boot_userbots())
+            
         except Exception as e:
             self.LOGGER(__name__).error(f"Error during bot startup: {e}")
             raise
@@ -57,14 +57,14 @@ class Bot(Client):
         except Exception as e:
             self.LOGGER(__name__).error(f"Error during bot shutdown: {e}")
 
-# Health check for Flask
+# Health check for Flask (Bypasses health checks on Koyeb)
 app = Flask(__name__)
 
 @app.route('/health', methods=['GET'])
+@app.route('/', methods=['GET'])
 def health_check():
     return jsonify({"status": "OK"}), 200
 
-# Start Flask server in a separate thread
 def start_flask_server():
     try:
         port = int(os.getenv("PORT", 8080))
@@ -72,16 +72,13 @@ def start_flask_server():
     except Exception as e:
         logging.error(f"Failed to start the Flask server: {e}")
 
-# Main function to run both bot and Flask server concurrently
 def main():
     bot = Bot()
 
-    # Start Flask server in a separate thread
     flask_thread = Thread(target=start_flask_server)
-    flask_thread.daemon = True  # Ensure it exits when the main program exits
+    flask_thread.daemon = True  
     flask_thread.start()
 
-    # Run the bot using bot.run()
     bot.run()
 
 if __name__ == "__main__":
