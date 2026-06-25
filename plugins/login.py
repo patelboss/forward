@@ -89,3 +89,18 @@ async def login(client, message):
     except Exception as e:
         logger.error(f"Login failed for user {user_id}: {e}")
         await message.reply(f"<b>❌ Login failed:</b> {e}", parse_mode=ParseMode.HTML)
+@Client.on_message(filters.command("restart") & filters.private)
+async def hard_restart(client, message):
+    user_id = message.from_user.id
+    logger.info(f"🔄 User {user_id} triggered an engine memory soft-restart via command.")
+    
+    await message.reply("<b>🔄 Initializing Engine Restart...</b>\n\nFlushing running RAM and reloading all background client listeners directly from MongoDB. Please wait 5-10 seconds.", parse_mode=ParseMode.HTML)
+    
+    # Gracefully notify and clean up parent application connection before process drops
+    try:
+        await client.stop()
+    except Exception:
+        pass
+
+    # Replace current runtime image process instantly with itself
+    os.execv(sys.executable, [sys.executable] + sys.argv)
