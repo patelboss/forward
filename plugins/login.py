@@ -12,14 +12,17 @@ from pyrogram.errors import (
     PhoneNumberInvalid,
     SessionPasswordNeeded,
 )
+from pyrogram.handlers import MessageHandler
+
 from database.database import save_user_session, get_user_session, users_col
 from info import API_ID, API_HASH
 
-# Import the running memory cache from your forward plugin so we can kill the client instance
+# Import the running memory cache and forward handler from your forward plugin
 try:
-    from plugins.forward import active_userbots
+    from plugins.forward import active_userbots, userbot_forward_handler
 except Exception:
     active_userbots = {}
+    userbot_forward_handler = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,42 +40,89 @@ async def _safe_stop_client(app: Client) -> None:
             logger.exception("Failed to stop/disconnect client cleanly.")
 
 
-async def _stop_active_userbot(user_id: int) -> None:
+async def _stop_active_userbot(user_id: int, *, logout: bool = False) -> None:
     worker_client = active_userbots.get(user_id)
     if not worker_client:
         return
 
     try:
         if worker_client.is_connected:
-            try:
-                await worker_client.log_out()
-            except Exception:
+            if logout:
+                try:
+                    await worker_client.log_out()
+                except Exception:
+                    await worker_client.stop()
+            else:
                 await worker_client.stop()
     except Exception:
-        logger.warning("Non-critical issue encountered while logging out worker client.", exc_info=True)
+        logger.warning(
+            "Non-critical issue encountered while stopping userbot client.",
+            exc_info=True,
+        )
     finally:
         active_userbots.pop(user_id, None)
 
 
-async def _restart_process(client: Client | None = None) -> None:
+async def _start_active_userbot(user_id: int, session_string: str) -> bool:
+    if userbot_forward_handler is None:
+        logger.warning(
+            "Forward handler could not be imported. Userbot for %s was not started.",
+            user_id,
+        )
+        return False
+
+    # Stop any previous instance first, without logging it out.
+    await _stop_active_userbot(user_id, logout=False)
+
+    user_client = Client(
+        name=f"worker_{user_id}",
+        session_string=session_string,
+        api_id=API_ID,
+        api_hash=API_HASH,
+        in_memory=True,
+    )
+    user_client.add_handler(MessageHandler(userbot_forward_handler, filters.incoming))
+
     try:
-        if client is not None:
-            await _safe_stop_client(client)
-    finally:
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        await user_client.start()
+        active_userbots[user_id] = user_client
+        logger.info("Background userbot started for user %s.", user_id)
+        return True
+    except Exception:
+        logger.exception("Failed to start background userbot for user %s.", user_id)
+        try:
+            await _safe_stop_client(user_client)
+        except Exception:
+            pass
+        return False
 
 
-@Client.on_message(filters.command("login") & filters.private)
-async def login(client, message):
+async def _restart_process() -> None:
+    # Give Telegram a moment to send the message before replacing the process.
+    await asyncio.sleep(2)
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+    return
+
+
+async def _auth_flow(client: Client, message, *, replace_existing: bool) -> None:
     user_id = message.from_user.id
-    logger.info("Login attempt initiated for user %s.", user_id)
+    logger.info("Auth flow started for user %s. replace_existing=%s", user_id, replace_existing)
 
-    # Check if the user is already logged in
-    session = get_user_session(user_id)
-    if session:
-        logger.info("User %s is already logged in.", user_id)
-        await message.reply_text("You're already logged in!", parse_mode=ParseMode.HTML)
+    existing_session = get_user_session(user_id)
+    if existing_session and not replace_existing:
+        await message.reply_text(
+            "<b>You're already logged in.</b>\n\n"
+            "Use /relogin to replace the current session without losing your configuration.",
+            parse_mode=ParseMode.HTML,
+        )
         return
+
+    if replace_existing:
+        await message.reply_text(
+            "<b>🔄 Re-authentication mode enabled.</b>\n\n"
+            "Your new session will replace the old one, while keeping your configuration.",
+            parse_mode=ParseMode.HTML,
+        )
 
     user_client = None
     try:
@@ -167,7 +217,6 @@ async def login(client, message):
             try:
                 session_str = await user_client.export_session_string()
             except Exception:
-                # Fallback for older/newer Pyrogram builds if export_session_string is unavailable.
                 session_str = getattr(user_client, "session_string", None)
 
             if not session_str:
@@ -179,19 +228,26 @@ async def login(client, message):
 
             save_user_session(user_id, session_str)
 
-            logger.info("Login successful for user %s. Restarting process.", user_id)
-            await message.reply_text(
-                "<b>✅ Login successful! The engine process is restarting now to safely spin up your background forwarder daemon...</b>",
-                parse_mode=ParseMode.HTML,
-            )
+            started = await _start_active_userbot(user_id, session_str)
 
-            await _restart_process(client)
+            if started:
+                await message.reply_text(
+                    "<b>✅ Session saved successfully!</b>\n\n"
+                    "Your background forwarder has been started without a restart.",
+                    parse_mode=ParseMode.HTML,
+                )
+            else:
+                await message.reply_text(
+                    "<b>✅ Session saved successfully!</b>\n\n"
+                    "The new session is stored in MongoDB, but the forwarder could not be started automatically.",
+                    parse_mode=ParseMode.HTML,
+                )
 
         finally:
             await _safe_stop_client(user_client)
 
     except FloodWait as e:
-        logger.warning("FloodWait during login for user %s: %s", user_id, e)
+        logger.warning("FloodWait during auth for user %s: %s", user_id, e)
         await message.reply_text(
             f"<b>❌ Login failed:</b> Telegram rate limit. Please wait {e.value} seconds and try again.",
             parse_mode=ParseMode.HTML,
@@ -212,13 +268,23 @@ async def login(client, message):
             parse_mode=ParseMode.HTML,
         )
     except Exception as e:
-        logger.error("Login failed for user %s: %s", user_id, e, exc_info=True)
+        logger.error("Auth failed for user %s: %s", user_id, e, exc_info=True)
         await message.reply_text(f"<b>❌ Login failed:</b> {e}", parse_mode=ParseMode.HTML)
         try:
             if user_client is not None:
                 await _safe_stop_client(user_client)
         except Exception:
             pass
+
+
+@Client.on_message(filters.command("login") & filters.private)
+async def login(client, message):
+    await _auth_flow(client, message, replace_existing=False)
+
+
+@Client.on_message(filters.command("relogin") & filters.private)
+async def relogin(client, message):
+    await _auth_flow(client, message, replace_existing=True)
 
 
 # =====================================================================
@@ -231,19 +297,18 @@ async def hard_restart(client, message):
 
     await message.reply_text(
         "<b>🔄 Initializing Engine Restart...</b>\n\n"
-        "Flushing running RAM and reloading all background client listeners directly from MongoDB. "
-        "Please wait a few seconds.",
+        "Flushing running RAM and reloading all background client listeners directly from MongoDB.",
         parse_mode=ParseMode.HTML,
     )
 
     try:
         # Stop background userbot workers first so the process restarts cleanly.
         for uid in list(active_userbots.keys()):
-            await _stop_active_userbot(uid)
+            await _stop_active_userbot(uid, logout=False)
     except Exception:
         logger.exception("Error while stopping active userbots before restart.")
 
-    await _restart_process(client)
+    await _restart_process()
 
 
 # =====================================================================
@@ -268,7 +333,7 @@ async def logout_cmd(client, message):
     )
 
     # Stop and remove the active background worker for this user, if present.
-    await _stop_active_userbot(user_id)
+    await _stop_active_userbot(user_id, logout=True)
 
     # Permanently wipe the session string record out of MongoDB collection.
     try:
